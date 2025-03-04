@@ -5,8 +5,7 @@ from mysql.connector import Error
 import json
 from datetime import date
 
-LISTAR_ALUMNOS_PROC = "ListarAlumnosPorInstitucion"
-LISTAR_APODERADOS_PROC = "ListarApoderadosPorAlumno"
+LISTAR_ALUMNOS_PROC = "ListarAlumnosPorApoderado"
 
 def convert_date(value):
     if isinstance(value, date):
@@ -21,8 +20,18 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event['body']) if 'body' in event else {}
         token = body.get('token')
-        id_institucion = body.get('id_institucion')
+        id_apoderado = body.get('id_apoderado')
         id_matricula = body.get('id_matricula')
+
+        if not id_apoderado or not id_matricula:
+            print("Faltan parámetros: id_apoderado o id_matricula")
+            return {
+                "statusCode": 400,
+                "body": json.dumps({
+                    "status": FAILED,
+                    "message": "Se requieren id_apoderado e id_matricula para listar alumnos."
+                })
+            }
 
         print("Validando token recibido:", token)
         token_result = validate_token(token)
@@ -37,40 +46,29 @@ def lambda_handler(event, context):
                 })
             }
 
-        print("Token válido, listando alumnos de la institución:", id_institucion)
+        print(f"Token válido, listando alumnos para apoderado: {id_apoderado}, matrícula: {id_matricula}")
 
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor()
 
-        cursor.callproc(LISTAR_ALUMNOS_PROC, [id_institucion, id_matricula])
+        cursor.callproc(LISTAR_ALUMNOS_PROC, [id_matricula, id_apoderado])
 
         alumnos_data = []
         for result in cursor.stored_results():
             alumnos_data.extend(result.fetchall())
 
         if alumnos_data:
-            alumnos_list = []
-
-            for row in alumnos_data:
-                alumno = {desc[0]: convert_date(value) for desc, value in zip(result.description, row)}
-
-                # Obtener los apoderados para el alumno actual
-                apoderados = []
-                cursor.callproc(LISTAR_APODERADOS_PROC, [alumno['id_alumno']])
-                for apoderado_result in cursor.stored_results():
-                    apoderados.extend([{
-                        desc[0]: convert_date(value) for desc, value in zip(apoderado_result.description, apoderado_row)
-                    } for apoderado_row in apoderado_result.fetchall()])
-
-                alumno['apoderados'] = apoderados
-                alumnos_list.append(alumno)
+            alumnos_json = json.dumps([
+                {desc[0]: convert_date(value) for desc, value in zip(result.description, row)} 
+                for row in alumnos_data
+            ])
 
             response = {
                 "statusCode": 200,
                 "body": json.dumps({
                     "status": SUCCESS,
                     "message": "Alumnos listados correctamente.",
-                    "alumnos": alumnos_list
+                    "alumnos": json.loads(alumnos_json)
                 })
             }
         else:
@@ -78,7 +76,7 @@ def lambda_handler(event, context):
                 "statusCode": 404,
                 "body": json.dumps({
                     "status": FAILED,
-                    "message": "No se encontraron alumnos para la institución proporcionada."
+                    "message": "No se encontraron alumnos para el apoderado y matrícula proporcionados."
                 })
             }
 

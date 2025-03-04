@@ -4,7 +4,7 @@ import mysql.connector
 from mysql.connector import Error
 import json
 
-DESACTIVAR_ALUMNO_PROC = "DesactivarAlumno"
+DESACTIVAR_ALUMNO_PROC = "ToggleEstadoAlumno"
 
 def lambda_handler(event, context):
     connection = None

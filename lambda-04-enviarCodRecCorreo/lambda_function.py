@@ -13,7 +13,7 @@ import resend
 def send_email_via_resend(email, code):
     try:
         response = resend.Emails.send({
-            "from": "no-reply@focusclass.xyz",  # Cambiado a tu dominio verificado
+            "from": "no-reply@focusclass.xyz",
             "to": email if isinstance(email, list) else [email],
             "subject": "Código de Recuperación de Cuenta - FocusClass",
             "html": f"""
@@ -26,7 +26,7 @@ def send_email_via_resend(email, code):
                         <table align="center" style="margin: 0 auto;">
                             <tr>
                                 <td style="text-align: center; padding: 10px;">
-                                    <img src="http://108.181.169.248/IMG-FOCUSCLASS/icon_focusclass.png" 
+                                    <img src="https://ll6aenqwm9.execute-api.us-east-1.amazonaws.com/service/util-01-imagen?img=icon_focusclass" 
                                          alt="FocusClass Logo" 
                                          style="height: 55px; display: inline-block; vertical-align: middle; margin-right: 10px;">
                                     <h1 style="color: #fff; font-size: 2em; display: inline-block; vertical-align: middle; margin: 0;">FocusClass</h1>
@@ -64,7 +64,7 @@ def send_email_via_resend(email, code):
         })
         
         if response.get('error'):
-            print("Error al enviar el correo:", response['error'])
+            print("Error al enviar el correo:", str(response))
             return False
         else:
             print("Correo enviado con éxito. ID del mensaje:", response.get('id'))

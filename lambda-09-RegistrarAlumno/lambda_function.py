@@ -69,12 +69,12 @@ def lambda_handler(event, context):
             for result in cursor.stored_results():
                 registro_result = result.fetchone()
 
-            if registro_result and registro_result[0] == "FAILED_ALREADY_REGISTERED":
+            if registro_result and registro_result[0] == "FAILED_ALUM_MATIRC_EXIST":
                 return {
                     "statusCode": 400,
                     "body": json.dumps({
                         "status": FAILED,
-                        "message": "El usuario ya está registrado como alumno."
+                        "message": "El alumno ya está registrado en esta matricula."
                     })
                 }
             elif registro_result and registro_result[0] == "FAILED_USER_NOT_FOUND":

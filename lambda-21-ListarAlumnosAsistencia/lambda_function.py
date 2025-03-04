@@ -3,14 +3,16 @@ from constants import DB_CONFIG, SUCCESS, FAILED, LOGOUT
 import mysql.connector
 from mysql.connector import Error
 import json
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 
-LISTAR_ALUMNOS_PROC = "ListarAlumnosPorInstitucion"
-LISTAR_APODERADOS_PROC = "ListarApoderadosPorAlumno"
+LISTAR_ALUMNOS_CON_ASISTENCIA_PROC = "ListarAlumnosConAsistenciaPorCurso"
 
 def convert_date(value):
     if isinstance(value, date):
-        return value.strftime('%Y-%m-%d')
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    elif isinstance(value, Decimal):
+        return float(value)
     return value
 
 def lambda_handler(event, context):
@@ -21,8 +23,8 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event['body']) if 'body' in event else {}
         token = body.get('token')
-        id_institucion = body.get('id_institucion')
-        id_matricula = body.get('id_matricula')
+        id_curso = body.get('id_curso')
+        fecha = body.get('fecha') 
 
         print("Validando token recibido:", token)
         token_result = validate_token(token)
@@ -37,40 +39,29 @@ def lambda_handler(event, context):
                 })
             }
 
-        print("Token válido, listando alumnos de la institución:", id_institucion)
+        print("Token válido, listando alumnos con asistencia para el curso:", id_curso, "en la fecha:", fecha)
 
         connection = mysql.connector.connect(**DB_CONFIG)
         cursor = connection.cursor()
 
-        cursor.callproc(LISTAR_ALUMNOS_PROC, [id_institucion, id_matricula])
+        cursor.callproc(LISTAR_ALUMNOS_CON_ASISTENCIA_PROC, [id_curso, fecha])
 
         alumnos_data = []
         for result in cursor.stored_results():
             alumnos_data.extend(result.fetchall())
 
         if alumnos_data:
-            alumnos_list = []
-
-            for row in alumnos_data:
-                alumno = {desc[0]: convert_date(value) for desc, value in zip(result.description, row)}
-
-                # Obtener los apoderados para el alumno actual
-                apoderados = []
-                cursor.callproc(LISTAR_APODERADOS_PROC, [alumno['id_alumno']])
-                for apoderado_result in cursor.stored_results():
-                    apoderados.extend([{
-                        desc[0]: convert_date(value) for desc, value in zip(apoderado_result.description, apoderado_row)
-                    } for apoderado_row in apoderado_result.fetchall()])
-
-                alumno['apoderados'] = apoderados
-                alumnos_list.append(alumno)
+            alumnos_json = json.dumps([
+                {desc[0]: convert_date(value) for desc, value in zip(result.description, row)} 
+                for row in alumnos_data
+            ])
 
             response = {
                 "statusCode": 200,
                 "body": json.dumps({
                     "status": SUCCESS,
-                    "message": "Alumnos listados correctamente.",
-                    "alumnos": alumnos_list
+                    "message": "Alumnos con asistencia listados correctamente.",
+                    "alumnos": json.loads(alumnos_json)
                 })
             }
         else:
@@ -78,7 +69,7 @@ def lambda_handler(event, context):
                 "statusCode": 404,
                 "body": json.dumps({
                     "status": FAILED,
-                    "message": "No se encontraron alumnos para la institución proporcionada."
+                    "message": "No se encontraron registros de asistencia para el curso y fecha proporcionados."
                 })
             }
 
@@ -86,12 +77,12 @@ def lambda_handler(event, context):
         return response
 
     except Error as e:
-        print("Error al listar alumnos:", str(e))
+        print("Error al listar alumnos con asistencia:", str(e))
         response = {
             "statusCode": 500,
             "body": json.dumps({
                 "status": FAILED,
-                "message": "Ocurrió un error al listar los alumnos."
+                "message": "Ocurrió un error al listar los alumnos con asistencia."
             })
         }
         return response
